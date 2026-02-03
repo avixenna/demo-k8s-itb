@@ -2,7 +2,7 @@ name: CI/CD Demo Apps
 
 on:
   push:
-    branches: [main, itb-demo]
+    branches: [master, itb-demo]
     paths:
       - 'k8s-lab/app/**'
       - 'k8s-lab/deploy.sh'
@@ -37,6 +37,10 @@ jobs:
                        -t ${REGISTRY}/${APP_NAME}/${APP_NAME}:latest \
                        -t ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.sha_short }} \
                        app/
+
+      - name: Login to Harbor registry
+        run: |
+          echo "${{ secrets.HARBOR_PASSWORD }}" | docker login harbor.192.168.59.10.nip.io:8080 -u "${{ secrets.HARBOR_USERNAME }}" --password-stdin
 
       - name: Push to registry
         run: |
