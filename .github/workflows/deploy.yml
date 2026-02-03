@@ -1,0 +1,111 @@
+name: CI/CD Demo Apps
+
+on:
+  push:
+    branches: [main, itb-demo]
+    paths:
+      - 'k8s-lab/app/**'
+      - 'k8s-lab/deploy.sh'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+env:
+  APP_NAME: demo-apps
+  NAMESPACE: ns-apps
+  REGISTRY: harbor.192.168.59.10.nip.io:8080
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set build variables
+        id: vars
+        run: |
+          echo "timestamp=$(date +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        working-directory: k8s-lab
+        run: |
+          docker build -t ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.timestamp }} \
+                       -t ${REGISTRY}/${APP_NAME}/${APP_NAME}:latest \
+                       -t ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.sha_short }} \
+                       app/
+
+      - name: Push to registry
+        run: |
+          docker push ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.timestamp }}
+          docker push ${REGISTRY}/${APP_NAME}/${APP_NAME}:latest
+          docker push ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.sha_short }}
+
+      - name: Ensure namespace exists
+        run: |
+          kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply manifests
+        working-directory: k8s-lab
+        run: |
+          kubectl apply -f k8s-manifests/
+
+      - name: Update deployment image
+        run: |
+          kubectl set image deployment/${APP_NAME} \
+            ${APP_NAME}=${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.timestamp }} \
+            -n ${NAMESPACE} --record
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE} --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          echo "=== Pods Status ==="
+          kubectl get pods -n ${NAMESPACE} -l app=${APP_NAME}
+
+          echo "=== Service Endpoints ==="
+          kubectl get endpoints ${APP_NAME} -n ${NAMESPACE}
+
+      - name: Health check
+        run: |
+          # Port forward and check health endpoint
+          kubectl -n ${NAMESPACE} port-forward svc/${APP_NAME} 8081:80 &
+          PF_PID=$!
+
+          sleep 5
+
+          # Check health endpoint
+          HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/health || echo "000")
+
+          if [ "$HEALTH_STATUS" = "200" ]; then
+            echo "✅ Health check passed (HTTP $HEALTH_STATUS)"
+            curl -s http://localhost:8081/health | jq . || curl -s http://localhost:8081/health
+          else
+            echo "❌ Health check failed (HTTP $HEALTH_STATUS)"
+          fi
+
+          kill $PF_PID 2>/dev/null || true
+
+      - name: Cleanup old images (optional)
+        if: always()
+        continue-on-error: true
+        run: |
+          # Remove dangling images older than 1 day
+          docker image prune -f --filter "until=24h"
+
+  rollback-on-failure:
+    name: Rollback on Failure
+    runs-on: self-hosted
+    needs: build-and-deploy
+    if: failure()
+    steps:
+      - name: Rollback deployment
+        run: |
+          echo "🔄 Rolling back deployment..."
+          kubectl rollout undo deployment/${APP_NAME} -n ${NAMESPACE}
+          kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE}

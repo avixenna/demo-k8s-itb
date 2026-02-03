@@ -1,0 +1,22 @@
+# Vagrant
+.vagrant/
+k8s-lab/.vagrant/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

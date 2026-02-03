@@ -1,0 +1,26 @@
+ENV['VAGRANT_NO_PARALLEL'] = 'yes'
+
+Vagrant.configure("2") do |config|
+
+  nodes = {
+    "master"  => { ip: "192.168.59.10", mem: 4096, cpu: 2 },
+    "worker1" => { ip: "192.168.59.11", mem: 4096, cpu: 2 },
+    "worker2" => { ip: "192.168.59.12", mem: 4096, cpu: 2 }
+  }
+
+  nodes.each do |name, spec|
+    config.vm.define name do |node|
+      node.vm.box = "bento/ubuntu-22.04"
+      node.vm.hostname = name
+      node.vm.network "private_network", ip: spec[:ip]
+
+      node.vm.provider "virtualbox" do |v|
+        v.name = name
+        v.memory = spec[:mem]
+        v.cpus   = spec[:cpu]
+      end
+
+      node.vm.provision "shell", path: "bootstrap.sh"
+    end
+  end
+end
