@@ -111,7 +111,7 @@ jobs:
           TEXT="✅ [demo-apps] Deployment Success%0A%0A"
           TEXT="${TEXT}🕒 ${TIMESTAMP}%0A"
           TEXT="${TEXT}📦 Image: ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.timestamp }}%0A"
-          TEXT="${TEXT}🌐 URL: http://demo-apps.192.168.59.11.nip.io%0A"
+          TEXT="${TEXT}🌐 URL: http://demo-apps.10.0.108.25.nip.io%0A"
           TEXT="${TEXT}👤 Actor: ${{ github.actor }}"
 
           curl -s -X POST "${TELEGRAM_API_URL}" \
