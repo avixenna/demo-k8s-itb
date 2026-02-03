@@ -102,6 +102,24 @@ jobs:
           # Remove dangling images older than 1 day
           docker image prune -f --filter "until=24h"
 
+      - name: Notify Telegram (success)
+        if: success()
+        run: |
+          TELEGRAM_API_URL="https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
+          TEXT="✅ [demo-apps] Deployment Success%0A%0A"
+          TEXT="${TEXT}🕒 ${TIMESTAMP}%0A"
+          TEXT="${TEXT}📦 Image: ${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.timestamp }}%0A"
+          TEXT="${TEXT}🌐 URL: http://demo-apps.192.168.59.11.nip.io%0A"
+          TEXT="${TEXT}👤 Actor: ${{ github.actor }}"
+
+          curl -s -X POST "${TELEGRAM_API_URL}" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${TEXT}" \
+            -d parse_mode="Markdown" \
+            -o /dev/null
+
   rollback-on-failure:
     name: Rollback on Failure
     runs-on: self-hosted
@@ -113,3 +131,19 @@ jobs:
           echo "🔄 Rolling back deployment..."
           microk8s kubectl rollout undo deployment/${APP_NAME} -n ${NAMESPACE}
           microk8s kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE}
+
+      - name: Notify Telegram (failure)
+        run: |
+          TELEGRAM_API_URL="https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
+          TEXT="❌ [demo-apps] Deployment Failed%0A%0A"
+          TEXT="${TEXT}🕒 ${TIMESTAMP}%0A"
+          TEXT="${TEXT}👤 Actor: ${{ github.actor }}%0A"
+          TEXT="${TEXT}🔗 Workflow: ${{ github.server_url }}/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+          curl -s -X POST "${TELEGRAM_API_URL}" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${TEXT}" \
+            -d parse_mode="Markdown" \
+            -o /dev/null
