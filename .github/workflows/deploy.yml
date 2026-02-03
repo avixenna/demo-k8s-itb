@@ -50,35 +50,35 @@ jobs:
 
       - name: Ensure namespace exists
         run: |
-          kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+          microk8s kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | microk8s kubectl apply -f -
 
       - name: Apply manifests
         working-directory: k8s-lab
         run: |
-          kubectl apply -f k8s-manifests/
+          microk8s kubectl apply -f k8s-manifests/
 
       - name: Update deployment image
         run: |
-          kubectl set image deployment/${APP_NAME} \
+          microk8s kubectl set image deployment/${APP_NAME} \
             ${APP_NAME}=${REGISTRY}/${APP_NAME}/${APP_NAME}:${{ steps.vars.outputs.timestamp }} \
             -n ${NAMESPACE} --record
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE} --timeout=5m
+          microk8s kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE} --timeout=5m
 
       - name: Verify deployment
         run: |
           echo "=== Pods Status ==="
-          kubectl get pods -n ${NAMESPACE} -l app=${APP_NAME}
+          microk8s kubectl get pods -n ${NAMESPACE} -l app=${APP_NAME}
 
           echo "=== Service Endpoints ==="
-          kubectl get endpoints ${APP_NAME} -n ${NAMESPACE}
+          microk8s kubectl get endpoints ${APP_NAME} -n ${NAMESPACE}
 
       - name: Health check
         run: |
           # Port forward and check health endpoint
-          kubectl -n ${NAMESPACE} port-forward svc/${APP_NAME} 8081:80 &
+          microk8s kubectl -n ${NAMESPACE} port-forward svc/${APP_NAME} 8081:80 &
           PF_PID=$!
 
           sleep 5
@@ -111,5 +111,5 @@ jobs:
       - name: Rollback deployment
         run: |
           echo "🔄 Rolling back deployment..."
-          kubectl rollout undo deployment/${APP_NAME} -n ${NAMESPACE}
-          kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE}
+          microk8s kubectl rollout undo deployment/${APP_NAME} -n ${NAMESPACE}
+          microk8s kubectl rollout status deployment/${APP_NAME} -n ${NAMESPACE}
