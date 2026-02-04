@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
 
-const hello = 'Hello from CI/CD Demo App - SPSI';
+const hello = 'Hello from CI/CD Demo App - SPSI - xyz 12121212121212';
 
 // Health check endpoint untuk Kubernetes probes
 app.get('/health', (_req, res) => {
